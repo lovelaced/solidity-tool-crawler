@@ -15,7 +15,7 @@ pub async fn filter_solidity_repos(
     // Solidity-related terms to look for in commit messages
     let solidity_keywords = [
         "solidity", "contract", "sol", "evm", "hardhat", "foundry",
-        "pragma", "ethereum", "yul", "sc",
+        "pragma", "yul", "sc",
         "smart contract", "erc20", "erc721", "erc1155",
         "openzeppelin", "metamask", "gas", "abi", "bytecode",
         "ethers.js", "web3.js", "truffle", "solc",
