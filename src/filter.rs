@@ -1,11 +1,9 @@
 use serde_json::Value;
 use std::collections::HashSet;
-use crate::github_api::check_repo_for_file;
 
 pub async fn filter_solidity_repos(
     push_events: Vec<Value>,
-    token: &str,
-) -> (HashSet<String>, HashSet<String>) {
+) -> (HashSet<String>, HashSet<String>, HashSet<String>) {
     let mut hardhat_repos = HashSet::new();
     let mut foundry_repos = HashSet::new();
 
@@ -68,6 +66,8 @@ pub async fn filter_solidity_repos(
                 if let Some(added) = commit["added"].as_array() {
                     for file in added {
                         let file_name = file.as_str().unwrap();
+
+                        // Allow for both Hardhat and Foundry to be marked for the same repo
                         if file_name.ends_with("hardhat.config.js") || file_name.ends_with("hardhat.config.ts") {
                             is_hardhat_repo = true;
                             hardhat_repos.insert(repo_full_name.clone());
@@ -86,48 +86,20 @@ pub async fn filter_solidity_repos(
 
         // Only consider marking the repo for API checks if there's a Solidity-related commit
         if has_solidity_related_commit {
-            // If neither Hardhat nor Foundry config was found locally, flag the repo for API checks
-            if !is_hardhat_repo && !is_foundry_repo {
+            // Mark the repo for API checks if neither Hardhat nor Foundry config was found locally
+            if !is_hardhat_repo || !is_foundry_repo {
                 repos_to_check.insert(repo_full_name.clone());
                 println!("Marking repo {}/{} for API checks", owner_name, repo_name);
             }
+
+            // Indicate if a repo uses both Hardhat and Foundry
+            if is_hardhat_repo && is_foundry_repo {
+                println!("Repo {}/{} uses both Hardhat and Foundry", owner_name, repo_name);
+            }
         }
     }
 
-    // Only query the API for repos that were flagged for missing Hardhat or Foundry files
-    println!("Starting API checks for flagged repos...");
-    for repo_name in repos_to_check {
-        let mut found_anything = false;
-
-        if !hardhat_repos.contains(&repo_name) {
-            if check_repo_for_file(&repo_name, "hardhat.config.js", token).await
-                || check_repo_for_file(&repo_name, "hardhat.config.ts", token).await
-            {
-                hardhat_repos.insert(repo_name.clone());
-                println!("Hardhat config found via API in repo {}", repo_name);
-                found_anything = true;
-            }
-        }
-
-        if !foundry_repos.contains(&repo_name) {
-            if check_repo_for_file(&repo_name, "foundry.toml", token).await {
-                foundry_repos.insert(repo_name.clone());
-                println!("Foundry config found via API in repo {}", repo_name);
-                found_anything = true;
-            }
-        }
-
-        // Print "Nothing found" message if no relevant files were found
-        if !found_anything {
-            println!("Nothing found in {}", repo_name);
-        }
-    }
-
-    // Final summary output
-    println!("Finished processing push events.");
-    println!("Total Hardhat Repos detected: {}", hardhat_repos.len());
-    println!("Total Foundry Repos detected: {}", foundry_repos.len());
-
-    (hardhat_repos, foundry_repos)
+    // Return repos to check, local Hardhat repos, and local Foundry repos
+    (repos_to_check, hardhat_repos, foundry_repos)
 }
 
