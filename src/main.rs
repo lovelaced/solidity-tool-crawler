@@ -98,28 +98,20 @@ async fn run_github_api_checks(
 
     // Process each repo for GitHub API checks
     for repo_name in repos_to_check {
-        let mut found_anything = false;
+        let (found_hardhat, found_foundry) = github_api::check_repo_for_files(&repo_name, token).await?;
 
-        if !hardhat_repos.contains(&repo_name) {
-            if github_api::check_repo_for_file(&repo_name, "hardhat.config.js", token).await
-                || github_api::check_repo_for_file(&repo_name, "hardhat.config.ts", token).await
-            {
-                hardhat_repos.insert(repo_name.clone());
-                println!("Hardhat config found via API in repo {}", repo_name);
-                found_anything = true;
-            }
+        if found_hardhat {
+            hardhat_repos.insert(repo_name.clone());
+            println!("Hardhat config found via API in repo {}", repo_name);
         }
 
-        if !foundry_repos.contains(&repo_name) {
-            if github_api::check_repo_for_file(&repo_name, "foundry.toml", token).await {
-                foundry_repos.insert(repo_name.clone());
-                println!("Foundry config found via API in repo {}", repo_name);
-                found_anything = true;
-            }
+        if found_foundry {
+            foundry_repos.insert(repo_name.clone());
+            println!("Foundry config found via API in repo {}", repo_name);
         }
 
         // Print "Nothing found" message if no relevant files were found
-        if !found_anything {
+        if !found_hardhat && !found_foundry {
             println!("Nothing found in {}", repo_name);
         }
 
